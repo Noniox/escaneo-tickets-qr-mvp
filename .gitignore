@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+invitados.db
+key.pem
+cert.pem
+.vscode/
+.idea/
+*.csv
+!ejemplo_invitados.csv

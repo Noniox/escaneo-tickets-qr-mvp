@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📸 Scanner - Control de Acceso</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        /* Scanner-specific styles */
+        body {
+            overflow: hidden;
+        }
+
+        .scanner-container {
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scanner-header {
+            padding: 1rem;
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-dark) 100%);
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .scanner-header h1 {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .scanner-stats {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .scanner-stats span {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .scanner-stats .count {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .scanner-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: #000;
+            position: relative;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 1rem;
+            overflow: hidden;
+            border: 3px solid var(--primary);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+        }
+
+        #reader video {
+            border-radius: 0.75rem;
+        }
+
+        .scan-hint {
+            margin-top: 1.5rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .scan-hint .icon {
+            font-size: 2rem;
+            animation: pulse 2s ease infinite;
+        }
+
+        /* Result overlay - Full screen takeover */
+        .result-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+            z-index: 1000;
+            cursor: pointer;
+        }
+
+        .result-overlay.show {
+            display: flex;
+        }
+
+        .result-overlay.valid {
+            background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
+        }
+
+        .result-overlay.invalid {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f87171 100%);
+        }
+
+        .result-icon {
+            font-size: 8rem;
+            margin-bottom: 1rem;
+            animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .result-status {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .result-name {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .result-seat-label {
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            opacity: 0.8;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-seat {
+            font-size: 7rem;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            animation: pulse 1.5s ease infinite;
+            line-height: 1;
+        }
+
+        .result-hint {
+            position: absolute;
+            bottom: 3rem;
+            font-size: 1rem;
+            opacity: 0.7;
+            animation: fadeIn 1s ease 0.5s both;
+        }
+
+        /* Audio feedback indicator */
+        .audio-indicator {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: var(--bg-card);
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 100;
+            cursor: pointer;
+        }
+
+        @keyframes bounceIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px);
+            }
+
+            75% {
+                transform: translateX(10px);
+            }
+        }
+
+        .result-overlay.invalid .result-icon {
+            animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55), shake 0.5s ease 0.4s;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="scanner-container">
+        <!-- Header with stats -->
+        <div class="scanner-header">
+            <h1>📸 Scanner de Tickets</h1>
+            <div class="scanner-stats">
+                <span>✅ <span class="count" id="stat-checked">0</span> ingresados</span>
+                <span>⏳ <span class="count" id="stat-pending">0</span> pendientes</span>
+            </div>
+        </div>
+
+        <!-- Scanner body -->
+        <div class="scanner-body">
+            <div id="reader"></div>
+            <div class="scan-hint">
+                <div class="icon">📱</div>
+                <p>Apunta la cámara al código QR</p>
+            </div>
+        </div>
+
+        <!-- Audio toggle -->
+        <div class="audio-indicator" onclick="toggleAudio()">
+            <span id="audioIcon">🔊</span>
+            <span id="audioText">Sonido ON</span>
+        </div>
+    </div>
+
+    <!-- Result Overlay -->
+    <div id="resultOverlay" class="result-overlay" onclick="hideResult()">
+        <div class="result-icon" id="resultIcon"></div>
+        <div class="result-status" id="resultStatus"></div>
+        <div class="result-name" id="resultName"></div>
+        <div class="result-seat-label" id="seatLabel">ASIENTO</div>
+        <div class="result-seat" id="resultSeat"></div>
+        <div class="result-hint">Toca la pantalla para continuar</div>
+    </div>
+
+    <!-- Audio elements for feedback -->
+    <audio id="successSound" preload="auto">
+        <source
+            src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleTs="
+            type="audio/wav">
+    </audio>
+    <audio id="errorSound" preload="auto">
+        <source
+            src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1eaYKVkoVoTUpllKWdjGQ4MFqGpKeMZjgx"
+            type="audio/wav">
+    </audio>
+
+    <!-- html5-qrcode library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <script>
+        // State
+        let isProcessing = false;
+        let audioEnabled = true;
+        let html5QrCode = null;
+
+        // Audio context for better mobile support
+        let audioContext = null;
+
+        // Initialize scanner on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initScanner();
+            await loadStats();
+
+            // Refresh stats every 10 seconds
+            setInterval(loadStats, 10000);
+        });
+
+        async function initScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1,
+                showTorchButtonIfSupported: true,
+                showZoomSliderIfSupported: true
+            };
+
+            try {
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    onScanSuccess,
+                    onScanError
+                );
+                console.log("✅ Scanner started");
+            } catch (err) {
+                console.error("Error starting scanner:", err);
+                // Try with user-facing camera as fallback
+                try {
+                    await html5QrCode.start(
+                        { facingMode: "user" },
+                        config,
+                        onScanSuccess,
+                        onScanError
+                    );
+                } catch (err2) {
+                    alert("❌ No se pudo acceder a la cámara. Por favor permite el acceso.");
+                }
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            if (isProcessing) return;
+
+            isProcessing = true;
+            console.log("📸 QR detected:", decodedText);
+
+            // Vibrate for haptic feedback (if supported)
+            if (navigator.vibrate) {
+                navigator.vibrate(100);
+            }
+
+            // Validate the QR code
+            validateQR(decodedText);
+        }
+
+        function onScanError(error) {
+            // Ignore - this fires constantly when no QR is detected
+        }
+
+        async function validateQR(code) {
+            try {
+                const response = await fetch('/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+
+                const result = await response.json();
+                showResult(result);
+
+            } catch (error) {
+                console.error("Error validating QR:", error);
+                showResult({
+                    status: 'error',
+                    message: 'ERROR DE CONEXIÓN',
+                    nombre: null,
+                    asiento: null
+                });
+            }
+        }
+
+        function showResult(result) {
+            const overlay = document.getElementById('resultOverlay');
+            const icon = document.getElementById('resultIcon');
+            const status = document.getElementById('resultStatus');
+            const name = document.getElementById('resultName');
+            const seatLabel = document.getElementById('seatLabel');
+            const seat = document.getElementById('resultSeat');
+
+            // Remove previous classes
+            overlay.classList.remove('valid', 'invalid');
+
+            if (result.status === 'valid') {
+                // SUCCESS - Green screen
+                overlay.classList.add('valid');
+                icon.textContent = '✅';
+                status.textContent = result.message;
+                name.textContent = result.nombre;
+                seatLabel.style.display = 'block';
+                seat.textContent = result.asiento;
+
+                playSound('success');
+
+            } else {
+                // ERROR - Red screen
+                overlay.classList.add('invalid');
+                icon.textContent = '❌';
+                status.textContent = result.message;
+
+                if (result.nombre) {
+                    name.textContent = result.nombre;
+                    seatLabel.style.display = 'block';
+                    seat.textContent = result.asiento;
+                } else {
+                    name.textContent = '';
+                    seatLabel.style.display = 'none';
+                    seat.textContent = '';
+                }
+
+                playSound('error');
+
+                // Extra vibration for errors
+                if (navigator.vibrate) {
+                    navigator.vibrate([200, 100, 200]);
+                }
+            }
+
+            overlay.classList.add('show');
+
+            // Update stats
+            loadStats();
+        }
+
+        function hideResult() {
+            const overlay = document.getElementById('resultOverlay');
+            overlay.classList.remove('show');
+
+            // Allow scanning again after a short delay
+            setTimeout(() => {
+                isProcessing = false;
+            }, 500);
+        }
+
+        function playSound(type) {
+            if (!audioEnabled) return;
+
+            // Create oscillator for more reliable mobile audio
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                if (type === 'success') {
+                    // Happy ascending tone
+                    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+                    oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+                    oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.4);
+                } else {
+                    // Error buzzer
+                    oscillator.frequency.setValueAtTime(220, audioContext.currentTime); // A3
+                    oscillator.type = 'square';
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                }
+            } catch (e) {
+                console.log("Audio not available");
+            }
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            document.getElementById('audioIcon').textContent = audioEnabled ? '🔊' : '🔇';
+            document.getElementById('audioText').textContent = audioEnabled ? 'Sonido ON' : 'Sonido OFF';
+
+            // Initialize audio context on user interaction (required by browsers)
+            if (audioEnabled && !audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/stats');
+                const stats = await response.json();
+
+                document.getElementById('stat-checked').textContent = stats.checked_in;
+                document.getElementById('stat-pending').textContent = stats.pending;
+            } catch (e) {
+                console.error("Error loading stats:", e);
+            }
+        }
+
+        // Handle visibility change (when phone screen turns off/on)
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                // Refresh stats when coming back
+                loadStats();
+            }
+        });
+    </script>
+</body>
+
+</html>

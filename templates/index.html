@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Control de Acceso</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <h1 class="text-gradient">🎫 Control de Acceso</h1>
+        <p>Sistema de escaneo de tickets con QR</p>
+    </header>
+
+    <div class="container">
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">{{ stats.total }}</div>
+                <div class="stat-label">Total Invitados</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-value" id="stat-checked">{{ stats.checked_in }}</div>
+                <div class="stat-label">Ingresados</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-value" id="stat-pending">{{ stats.pending }}</div>
+                <div class="stat-label">Pendientes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-percent">{{ stats.percentage }}%</div>
+                <div class="stat-label">Porcentaje</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📱 Acceso Rápido</h3>
+            </div>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <a href="/scanner" target="_blank" class="btn btn-success btn-lg">
+                    📸 Abrir Scanner
+                </a>
+                <button onclick="refreshStats()" class="btn btn-outline">
+                    🔄 Actualizar Estadísticas
+                </button>
+                <button onclick="resetCheckins()" class="btn btn-danger">
+                    ⚠️ Reiniciar Check-ins
+                </button>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📁 Cargar Lista de Invitados</h3>
+            </div>
+            <form id="uploadForm">
+                <div class="file-upload" id="dropZone">
+                    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+                    <div class="file-upload-icon">📄</div>
+                    <div class="file-upload-text">
+                        <strong>Arrastra un archivo</strong> o haz clic para seleccionar
+                    </div>
+                    <div class="file-upload-text text-muted mt-sm">
+                        Formatos: CSV, Excel (.xlsx, .xls)
+                    </div>
+                    <div id="fileName" class="mt-md text-success" style="display: none;"></div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg mt-lg" style="width: 100%;">
+                    ⬆️ Cargar Invitados
+                </button>
+            </form>
+        </div>
+
+        <!-- Guests Table -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">👥 Lista de Invitados</h3>
+                <span class="badge badge-success" id="guestCount">{{ guests|length }} registros</span>
+            </div>
+            
+            {% if guests %}
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Asiento</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="guestsTableBody">
+                        {% for guest in guests %}
+                        <tr>
+                            <td>
+                                <strong>{{ guest.nombre }}</strong>
+                                {% if guest.email %}
+                                <br><span class="text-muted">{{ guest.email }}</span>
+                                {% endif %}
+                            </td>
+                            <td><strong>{{ guest.asiento }}</strong></td>
+                            <td>
+                                {% if guest.checked_in %}
+                                <span class="badge badge-success">✓ Ingresado</span>
+                                {% else %}
+                                <span class="badge badge-warning">⏳ Pendiente</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/qr/{{ guest.uuid }}" target="_blank" class="btn btn-outline btn-sm">
+                                    QR
+                                </a>
+                                <a href="/ticket/{{ guest.uuid }}" target="_blank" class="btn btn-primary btn-sm">
+                                    Ticket
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted" style="padding: 3rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📋</div>
+                <p>No hay invitados registrados</p>
+                <p class="text-muted">Sube un archivo CSV o Excel para comenzar</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <script>
+        // File Upload Handling
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const fileName = document.getElementById('fileName');
+        const uploadForm = document.getElementById('uploadForm');
+
+        // Drag and drop effects
+        ['dragenter', 'dragover'].forEach(event => {
+            dropZone.addEventListener(event, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(event => {
+            dropZone.addEventListener(event, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+            });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                fileInput.files = files;
+                showFileName(files[0].name);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                showFileName(fileInput.files[0].name);
+            }
+        });
+
+        function showFileName(name) {
+            fileName.textContent = `📄 ${name}`;
+            fileName.style.display = 'block';
+        }
+
+        // Form submission
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!fileInput.files.length) {
+                showToast('Por favor selecciona un archivo', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast(result.detail || 'Error al cargar archivo', 'error');
+                }
+            } catch (error) {
+                showToast('Error de conexión', 'error');
+            }
+        });
+
+        // Refresh stats
+        async function refreshStats() {
+            try {
+                const response = await fetch('/stats');
+                const stats = await response.json();
+                
+                document.getElementById('stat-total').textContent = stats.total;
+                document.getElementById('stat-checked').textContent = stats.checked_in;
+                document.getElementById('stat-pending').textContent = stats.pending;
+                document.getElementById('stat-percent').textContent = stats.percentage + '%';
+                
+                showToast('Estadísticas actualizadas', 'success');
+            } catch (error) {
+                showToast('Error al actualizar', 'error');
+            }
+        }
+
+        // Reset check-ins
+        async function resetCheckins() {
+            if (!confirm('⚠️ ¿Estás seguro de reiniciar TODOS los check-ins?\n\nEsto marcará a todos los invitados como "Pendiente".')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/reset', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                }
+            } catch (error) {
+                showToast('Error al reiniciar', 'error');
+            }
+        }
+
+        // Toast notifications
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Auto-refresh stats every 30 seconds
+        setInterval(refreshStats, 30000);
+    </script>
+</body>
+</html>

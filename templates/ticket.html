@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket - {{ guest.nombre }}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        /* Ticket-specific styles */
+        body {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .ticket {
+            background: white;
+            border-radius: 1.5rem;
+            padding: 3rem 2.5rem;
+            text-align: center;
+            max-width: 380px;
+            width: 100%;
+            box-shadow:
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Decorative elements */
+        .ticket::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7);
+        }
+
+        /* Perforated edge effect */
+        .ticket::after {
+            content: '';
+            position: absolute;
+            bottom: 120px;
+            left: -10px;
+            right: -10px;
+            height: 20px;
+            background:
+                radial-gradient(circle, #0f172a 10px, transparent 10px) repeat-x;
+            background-size: 30px 20px;
+            background-position: 0 10px;
+        }
+
+        .ticket-event {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: #6366f1;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .ticket-qr {
+            background: white;
+            padding: 1rem;
+            border-radius: 1rem;
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .ticket-qr img {
+            width: 180px;
+            height: 180px;
+            display: block;
+        }
+
+        .ticket-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+            margin: 1.5rem 0;
+        }
+
+        .ticket-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-email {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-bottom: 1.5rem;
+        }
+
+        .ticket-seat-container {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .ticket-seat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-seat {
+            font-size: 4rem;
+            font-weight: 900;
+            color: white;
+            letter-spacing: 0.05em;
+            line-height: 1;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Print button */
+        .print-button {
+            margin-top: 2rem;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .print-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+
+        .back-link {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .back-link:hover {
+            color: var(--primary);
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white !important;
+                padding: 0;
+                min-height: auto;
+            }
+
+            .ticket {
+                box-shadow: none;
+                border: 2px solid #e2e8f0;
+                max-width: 100%;
+                page-break-inside: avoid;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .ticket-seat-container {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+        /* Multiple tickets per page */
+        @media print {
+            @page {
+                size: auto;
+                margin: 1cm;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ticket">
+        <div class="ticket-event">🎫 Ticket de Entrada</div>
+
+        <div class="ticket-qr">
+            <img src="/qr/{{ guest.uuid }}" alt="QR Code">
+        </div>
+
+        <div class="ticket-divider"></div>
+
+        <div class="ticket-name">{{ guest.nombre }}</div>
+        {% if guest.email %}
+        <div class="ticket-email">{{ guest.email }}</div>
+        {% endif %}
+
+        <div class="ticket-seat-container">
+            <div class="ticket-seat-label">Tu Asiento</div>
+            <div class="ticket-seat">{{ guest.asiento }}</div>
+        </div>
+    </div>
+
+    <button class="print-button no-print" onclick="window.print()">
+        🖨️ Imprimir Ticket
+    </button>
+
+    <a href="/" class="back-link no-print">
+        ← Volver al panel
+    </a>
+</body>
+
+</html>
