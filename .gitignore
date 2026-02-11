@@ -13,3 +13,4 @@ cert.pem
 .idea/
 *.csv
 !ejemplo_invitados.csv
+!data/lista_maestra.csv

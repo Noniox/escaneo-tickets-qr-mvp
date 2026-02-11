@@ -1,51 +1,44 @@
-# 🎫 Sistema de Control de Acceso (MVP)
+# Sistema de Control de Acceso - Instrucciones de Instalación
 
-Sistema simple y ligero de control de acceso mediante códigos QR, ideal para eventos en Anfiteatros.
+Este sistema permite escanear tickets y gestionar el acceso de invitados. Está diseñado para ser portable y fácil de instalar en cualquier computadora Windows.
 
-## 🚀 Características
-- **Carga Masiva**: Sube listas de invitados desde archivos CSV o Excel (.xlsx).
-- **Tickets Personalizados**: Generación automática de tickets con nombre, asiento y código QR.
-- **App de Escaneo**: Aplicación web optimizada para móviles para validación rápida en puerta.
-- **Validación en Tiempo Real**: Detecta tickets válidos, duplicados o inválidos con feedback visual (verde/rojo) y sonoro.
-- **Estadísticas**: Panel con métricas de ingreso en tiempo real.
-- **Seguridad**: Configuración HTTPS local para habilitar permisos de cámara en dispositivos móviles.
+## 📁 Estructura de Carpetas
 
-## 🛠️ Tecnologías
-- **Backend**: FastAPI (Python)
-- **Base de Datos**: SQLite
-- **Frontend**: HTML5, CSS3, JavaScript Vanilla
-- **Librerías**: `html5-qrcode`, `pandas`, `qrcode`
+*   **_INSTALAR_PRIMERO.bat**: Ejecute esto PRIMERO en una nueva PC. Instala todo lo necesario.
+*   **_INICIAR_SISTEMA.bat**: Ejecute esto para abrir el sistema cuando ya esté instalado.
+*   **data/**: Carpeta donde se guardan los archivos de datos (Excel original y lista maestra).
+*   **scripts/**: Scripts de utilidad (configuración de firewall, acceso remoto, etc.).
+*   **app.py / database.py**: Código fuente del sistema.
 
-## 📋 Requisitos
-- Python 3.10 o superior.
+## 🚀 Pasos para Instalar en una Nueva PC
 
-## ⚙️ Instalación y Uso
+1.  **Copiar la carpeta**: Copie toda la carpeta del proyecto al Disco C: o al Escritorio de la nueva PC.
+    *   *Nota: No es necesario copiar la carpeta `venv` ni `__pycache__` si existen, ya que se crearán de nuevo.*
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone [URL-DEL-REPO]
-   cd [NOMBRE-CARPETA]
-   ```
+2.  **Instalar Python**: Asegúrese de que la PC tenga instalado **Python 3.10 o superior**.
+    *   Puede descargarlo gratis en: https://www.python.org/downloads/
+    *   **IMPORTANTE**: Al instalar, marque la casilla **"Add Python to PATH"** (Agregar Python al PATH).
 
-2. **Instalar dependencias:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+3.  **Ejecutar Instalador**:
+    *   Haga doble clic en el archivo `_INSTALAR_PRIMERO.bat`.
+    *   Espere a que termine el proceso (puede tardar unos minutos descargando librerías).
+    *   Si todo sale bien, verá un mensaje de "INSTALACION COMPLETADA CON EXITO".
 
-3. **Generar certificados SSL (Requerido para la cámara en móvil):**
-   ```bash
-   python generate_cert.py
-   ```
+4.  **Iniciar el Sistema**:
+    *   Haga doble clic en `_INICIAR_SISTEMA.bat`.
+    *   Se abrirá una ventana negra (el servidor) y automáticamente su navegador web en la dirección del sistema.
 
-4. **Iniciar el servidor:**
-   ```bash
-   python -m uvicorn app:app --host 0.0.0.0 --port 8000 --ssl-keyfile key.pem --ssl-certfile cert.pem
-   ```
+## 📋 Gestión de Invitados
 
-5. **Acceder:**
-   - **Panel Admin**: `https://localhost:8000`
-   - **App de Escaneo**: `https://[TU-IP-LOCAL]:8000/scanner`
+*   **Lista Maestra**: El sistema carga inicialmente los invitados desde `data/lista_maestra.csv`.
+*   **Reiniciar Base de Datos**: Si desea borrar todo y volver a cargar la lista original, puede ejecutar de nuevo `_INSTALAR_PRIMERO.bat` (esto reiniciará la base de datos) o borrar el archivo `invitados.db` manualmente.
 
----
-> [!TIP]
-> Si el servidor no carga en el móvil, asegúrate de permitir el puerto 8000 en el **Firewall de Windows** o desactivarlo temporalmente para la red privada.
+## 🛠 Solución de Problemas
+
+*   **Error "Python no encontrado"**: Verifique que instaló Python y marcó la opción "Add to PATH". Reinicie la PC.
+*   **Acceso desde celulares (LAN)**: Si desea escanear con celulares conectados al mismo Wi-Fi:
+    1.  Ejecute `scripts/configurar_firewall.bat` como Administrador (clic derecho -> Ejecutar como admin).
+    2.  Busque la IP de la PC (ej. `192.168.1.15`) y use esa dirección en el celular: `http://192.168.1.15:8000`.
+
+## 📞 Soporte
+Si tiene dudas, contacte al desarrollador.

@@ -28,8 +28,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             uuid TEXT UNIQUE NOT NULL,
             nombre TEXT NOT NULL,
-            email TEXT,
-            asiento TEXT NOT NULL,
+            apellido TEXT NOT NULL,
+            sector TEXT NOT NULL,
+            fila TEXT NOT NULL,
+            cargo TEXT NOT NULL,
             checked_in INTEGER DEFAULT 0,
             checked_in_at TEXT
         )
@@ -50,20 +52,26 @@ def clear_guests():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM guests")
+    # Reset auto-increment sequence
+    try:
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='guests'")
+    except sqlite3.OperationalError:
+        pass # Table might not exist yet
+        
     conn.commit()
     conn.close()
 
 
-def add_guest(nombre: str, email: str, asiento: str) -> str:
+def add_guest(nombre: str, apellido: str, sector: str, cargo: str, fila: str) -> str:
     """Add a new guest and return their UUID"""
     guest_uuid = str(uuid_lib.uuid4())
     conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute("""
-        INSERT INTO guests (uuid, nombre, email, asiento)
-        VALUES (?, ?, ?, ?)
-    """, (guest_uuid, nombre, email, asiento))
+        INSERT INTO guests (uuid, nombre, apellido, sector, cargo, fila)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (guest_uuid, nombre, apellido, sector, cargo, fila))
     
     conn.commit()
     conn.close()
@@ -85,11 +93,12 @@ def get_guest_by_uuid(guest_uuid: str) -> dict | None:
 
 
 def get_all_guests() -> list[dict]:
-    """Get all guests"""
+    """Get all guests ordered by ID"""
     conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT * FROM guests ORDER BY nombre")
+    # Order by ID (Sequence number)
+    cursor.execute("SELECT * FROM guests ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
     

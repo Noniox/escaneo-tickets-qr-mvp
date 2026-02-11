@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,8 +8,10 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
     <header class="header">
         <h1 class="text-gradient">🎫 Control de Acceso</h1>
@@ -67,6 +70,9 @@
                         <strong>Arrastra un archivo</strong> o haz clic para seleccionar
                     </div>
                     <div class="file-upload-text text-muted mt-sm">
+                        Columnas requeridas: <strong>Nombre, Apellido, Sector, Fila, Cargo</strong>
+                    </div>
+                    <div class="file-upload-text text-muted mt-sm">
                         Formatos: CSV, Excel (.xlsx, .xls)
                     </div>
                     <div id="fileName" class="mt-md text-success" style="display: none;"></div>
@@ -83,29 +89,37 @@
                 <h3 class="card-title">👥 Lista de Invitados</h3>
                 <span class="badge badge-success" id="guestCount">{{ guests|length }} registros</span>
             </div>
-            
+
+            <div style="padding: 0 var(--space-lg) var(--space-lg);">
+                <input type="text" id="searchInput" class="form-control"
+                    placeholder="🔍 Buscar por nombre, apellido, cargo o sector..." onkeyup="filterGuests()">
+            </div>
+
             {% if guests %}
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
+                            <th>#</th>
                             <th>Nombre</th>
-                            <th>Asiento</th>
+                            <th>Sector</th>
+                            <th>Fila</th>
+                            <th>Cargo</th>
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="guestsTableBody">
                         {% for guest in guests %}
-                        <tr>
+                        <tr id="guest-row-{{ guest.uuid }}">
+                            <td>{{ guest.id }}</td>
                             <td>
-                                <strong>{{ guest.nombre }}</strong>
-                                {% if guest.email %}
-                                <br><span class="text-muted">{{ guest.email }}</span>
-                                {% endif %}
+                                <strong>{{ guest.nombre }} {{ guest.apellido }}</strong>
                             </td>
-                            <td><strong>{{ guest.asiento }}</strong></td>
-                            <td>
+                            <td><span class="badge badge-info">{{ guest.sector }}</span></td>
+                            <td><span class="badge badge-warning">{{ guest.fila }}</span></td>
+                            <td>{{ guest.cargo }}</td>
+                            <td class="status-cell">
                                 {% if guest.checked_in %}
                                 <span class="badge badge-success">✓ Ingresado</span>
                                 {% else %}
@@ -182,7 +196,7 @@
         // Form submission
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             if (!fileInput.files.length) {
                 showToast('Por favor selecciona un archivo', 'error');
                 return;
@@ -196,9 +210,9 @@
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (response.ok && result.success) {
                     showToast(result.message, 'success');
                     setTimeout(() => location.reload(), 1500);
@@ -210,20 +224,43 @@
             }
         });
 
-        // Refresh stats
+        // Refresh stats AND guest status
         async function refreshStats() {
             try {
-                const response = await fetch('/stats');
-                const stats = await response.json();
-                
+                // 1. Get Stats
+                const responseStats = await fetch('/stats');
+                const stats = await responseStats.json();
+
                 document.getElementById('stat-total').textContent = stats.total;
                 document.getElementById('stat-checked').textContent = stats.checked_in;
                 document.getElementById('stat-pending').textContent = stats.pending;
                 document.getElementById('stat-percent').textContent = stats.percentage + '%';
-                
-                showToast('Estadísticas actualizadas', 'success');
+
+                // 2. Get Guest Data for live update
+                const responseGuests = await fetch('/guests');
+                const guests = await responseGuests.json();
+
+                guests.forEach(guest => {
+                    const row = document.getElementById(`guest-row-${guest.uuid}`);
+                    if (row) {
+                        const statusCell = row.querySelector('.status-cell');
+                        if (guest.checked_in) {
+                            if (!statusCell.innerHTML.includes('badge-success')) {
+                                statusCell.innerHTML = '<span class="badge badge-success">✓ Ingresado</span>';
+                                // Flash effect
+                                row.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+                                setTimeout(() => row.style.backgroundColor = '', 2000);
+                            }
+                        } else {
+                            if (!statusCell.innerHTML.includes('badge-warning')) {
+                                statusCell.innerHTML = '<span class="badge badge-warning">⏳ Pendiente</span>';
+                            }
+                        }
+                    }
+                });
+
             } catch (error) {
-                showToast('Error al actualizar', 'error');
+                console.error("Error updating stats", error);
             }
         }
 
@@ -236,7 +273,7 @@
             try {
                 const response = await fetch('/reset', { method: 'POST' });
                 const result = await response.json();
-                
+
                 if (result.success) {
                     showToast(result.message, 'success');
                     setTimeout(() => location.reload(), 1500);
@@ -252,12 +289,49 @@
             toast.className = `toast ${type}`;
             toast.textContent = message;
             document.getElementById('toastContainer').appendChild(toast);
-            
+
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // Auto-refresh stats every 30 seconds
-        setInterval(refreshStats, 30000);
+        // Filter guests table
+        function filterGuests() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById("guestsTableBody");
+            const tr = table.getElementsByTagName("tr");
+            let visibleCount = 0;
+
+            for (let i = 0; i < tr.length; i++) {
+                // Combine text from relevant columns: ID(0), Name(1), Sector(2), Fila(3), Cargo(4)
+                const tdId = tr[i].getElementsByTagName("td")[0];
+                const tdName = tr[i].getElementsByTagName("td")[1];
+                const tdSector = tr[i].getElementsByTagName("td")[2];
+                const tdFila = tr[i].getElementsByTagName("td")[3];
+                const tdCargo = tr[i].getElementsByTagName("td")[4];
+
+                if (tdId && tdName && tdSector && tdFila && tdCargo) {
+                    const textValue = (tdId.textContent + " " + tdName.textContent + " " + tdSector.textContent + " " + tdFila.textContent + " " + tdCargo.textContent).toUpperCase();
+
+                    if (textValue.indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                        visibleCount++;
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+
+            // Update badge count
+            const badge = document.getElementById('guestCount');
+            if (badge) {
+                badge.textContent = visibleCount + " visibles";
+                if (filter === "") badge.textContent = tr.length + " registros";
+            }
+        }
+
+        // Auto-refresh stats every 5 seconds (faster)
+        setInterval(refreshStats, 5000);
     </script>
 </body>
+
 </html>

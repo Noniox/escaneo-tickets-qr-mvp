@@ -31,7 +31,7 @@ def get_local_ip():
 app = FastAPI(
     title="Sistema de Control de Acceso",
     description="MVP para escaneo de tickets con QR",
-    version="1.0.0"
+    version="2.1.0"
 )
 
 # Setup static files and templates
@@ -71,14 +71,14 @@ async def upload_file(file: UploadFile = File(...)):
         else:
             raise HTTPException(400, "Formato no soportado. Use CSV o Excel (.xlsx)")
         
-        # Normalize column names (case-insensitive)
+        # Normalize column names (case-insensitive, strip whitespace)
         df.columns = df.columns.str.strip().str.lower()
         
         # Validate required columns
-        required = ['nombre', 'asiento']
+        required = ['nombre', 'apellido', 'sector', 'cargo', 'fila']
         missing = [col for col in required if col not in df.columns]
         if missing:
-            raise HTTPException(400, f"Columnas faltantes: {', '.join(missing)}")
+            raise HTTPException(400, f"Columnas faltantes: {', '.join(missing)}. Se requieren: {', '.join(required)}")
         
         # Clear existing guests and add new ones
         db.clear_guests()
@@ -86,11 +86,13 @@ async def upload_file(file: UploadFile = File(...)):
         count = 0
         for _, row in df.iterrows():
             nombre = str(row['nombre']).strip()
-            email = str(row.get('email', '')).strip() if 'email' in df.columns else ''
-            asiento = str(row['asiento']).strip()
+            apellido = str(row['apellido']).strip()
+            sector = str(row['sector']).strip()
+            cargo = str(row['cargo']).strip()
+            fila = str(row['fila']).strip()
             
-            if nombre and asiento:
-                db.add_guest(nombre, email, asiento)
+            if nombre and apellido and sector and cargo:
+                db.add_guest(nombre, apellido, sector, cargo, fila)
                 count += 1
         
         return JSONResponse({
@@ -200,15 +202,21 @@ async def validate_scan(request: Request):
                 "status": "invalid",
                 "message": "CÓDIGO INVÁLIDO",
                 "nombre": None,
-                "asiento": None
+                "sector": None,
+                "cargo": None,
+                "fila": None
             })
+        
+        nombre_completo = f"{guest['nombre']} {guest['apellido']}"
         
         if guest["checked_in"]:
             return JSONResponse({
                 "status": "already_used",
                 "message": "TICKET YA USADO",
-                "nombre": guest["nombre"],
-                "asiento": guest["asiento"]
+                "nombre": nombre_completo,
+                "sector": guest["sector"],
+                "cargo": guest["cargo"],
+                "fila": guest["fila"]
             })
         
         # Mark as checked in
@@ -217,8 +225,10 @@ async def validate_scan(request: Request):
         return JSONResponse({
             "status": "valid",
             "message": "¡BIENVENIDO!",
-            "nombre": guest["nombre"],
-            "asiento": guest["asiento"]
+            "nombre": nombre_completo,
+            "sector": guest["sector"],
+            "cargo": guest["cargo"],
+            "fila": guest["fila"]
         })
         
     except Exception as e:
@@ -237,12 +247,32 @@ async def startup_event():
     """Ensure database is initialized on startup"""
     db.init_db()
     local_ip = get_local_ip()
+    
+    # Check for SSL
+    import os
+    
+    ssl_config = {}
+    if os.path.exists("key.pem") and os.path.exists("cert.pem") and not os.environ.get("NO_SSL"):
+        ssl_config = {
+            "ssl_keyfile": "key.pem",
+            "ssl_certfile": "cert.pem"
+        }
+    
     print("Sistema de Control de Acceso iniciado")
-    print(f"Panel de admin: https://localhost:8000")
-    print(f"Panel de admin (Red): https://{local_ip}:8000")
-    print(f"Scanner (Móvil): https://{local_ip}:8000/scanner")
+    print(f"Panel de admin: http://localhost:8000")
+    print(f"Panel de admin (Red): http://{local_ip}:8000")
+    print(f"Scanner (Móvil): http://{local_ip}:8000/scanner")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    import os
+    
+    ssl_config = {}
+    if os.path.exists("key.pem") and os.path.exists("cert.pem") and not os.environ.get("NO_SSL"):
+        ssl_config = {
+            "ssl_keyfile": "key.pem",
+            "ssl_certfile": "cert.pem"
+        }
+    
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True, **ssl_config)
